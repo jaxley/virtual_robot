@@ -1,0 +1,44 @@
+// Apply the Java plugin
+plugins {
+    id 'java'
+}
+
+// Set the source compatibility and target compatibility
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src']
+        }
+    }
+    test {
+        java {
+            srcDirs = ['src/test']
+        }
+    }
+}
+
+// Define the project group and version
+group 'com.example'
+version '1.0-SNAPSHOT'
+
+// Configure the repositories to fetch dependencies from
+repositories {
+    mavenCentral()
+    google()
+    gradlePluginPortal()
+    flatDir {
+        dirs '../lib'
+    }
+}
+
+// Define dependencies
+dependencies {
+    implementation files('../lib/Jamepad.jar')
+    implementation files('../lib/pedro_modified.jar')
+    implementation project(':Controller')
+}

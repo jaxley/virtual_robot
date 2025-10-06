@@ -455,7 +455,11 @@ public class VirtualRobotController {
             }
         });
 
-        cbxOpModes.setValue(cbxOpModes.getItems().get(0));
+        if (!cbxOpModes.getItems().isEmpty()) {
+            cbxOpModes.setValue(cbxOpModes.getItems().get(0));
+        } else {
+            System.out.println("WARNING: cbxOpModes were empty!");
+        }
     }
 
 

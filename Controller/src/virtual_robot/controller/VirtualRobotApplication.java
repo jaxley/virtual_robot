@@ -1,5 +1,7 @@
 package virtual_robot.controller;
 
+import java.net.URL;
+
 import javafx.application.Application;
 import javafx.event.EventHandler;
 import javafx.fxml.FXMLLoader;
@@ -18,7 +20,8 @@ public class VirtualRobotApplication extends Application {
 
     @Override
     public void start(Stage primaryStage) throws Exception{
-        FXMLLoader loader = new FXMLLoader(getClass().getResource("virtual_robot.fxml"));
+        URL resource = getClass().getResource("virtual_robot.fxml");
+        FXMLLoader loader = new FXMLLoader(resource);
         Parent root = (BorderPane)loader.load();
         controllerHandle = loader.getController();
         primaryStage.setTitle("Virtual Robot");

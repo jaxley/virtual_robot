@@ -1,0 +1,59 @@
+// Apply the Java plugin
+plugins {
+    id 'java'
+    id 'org.openjfx.javafxplugin' version '0.1.0'
+}
+
+// Set the source compatibility and target compatibility
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+javafx {
+    modules = [ 'javafx.controls', 'javafx.fxml' ]
+}
+
+/** This isn't working yet - javafx plugin is not applying so those classes aren't being resolved */
+/* subprojects {
+    apply plugin: 'java'
+    apply plugin: 'org.openjfx.javafxplugin'
+
+    sourceCompatibility = JavaVersion.VERSION_1_8
+
+    javafx {
+        modules = [ 'javafx.controls', 'javafx.fxml' ]
+    }
+
+    compileJava {
+        doFirst {
+            options.compilerArgs += [
+                    '--module-path', classpath.asPath
+            ]
+            classpath = files()
+        }
+    }
+} */
+
+// Define the project group and version
+group 'com.example'
+version '1.0-SNAPSHOT'
+
+// Configure the repositories to fetch dependencies from
+repositories {
+    mavenCentral()
+    google()
+    gradlePluginPortal()
+    flatDir {
+        dirs 'lib'
+    }
+}
+
+// Define dependencies
+dependencies {
+    implementation files('../lib/Jamepad.jar')
+    implementation files('../lib/dyn4j-4.1.4.jar')
+    implementation files('../lib/dyn4j-4.1.4-sources.jar')
+    implementation files('../lib/pedro_modified.jar')
+    implementation libs.reflections
+}

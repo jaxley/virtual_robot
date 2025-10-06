@@ -1,0 +1,91 @@
+// Apply the Java plugin
+plugins {
+    id 'java'
+    id 'org.openjfx.javafxplugin' version '0.1.0'
+//    id 'org.beryx.jlink' version '3.1.1'
+    id 'application'
+}
+
+javafx {
+    version = "22"
+    modules = [ 'javafx.controls', 'javafx.fxml' ]
+}
+
+// Set the source compatibility and target compatibility
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src']
+        }
+        resources {
+            srcDirs = ['src']
+        }
+    }
+    test {
+        java {
+            srcDirs = ['src/test']
+        }
+    }
+}
+
+tasks.register('copyResources', Copy) {
+    from 'src'
+    into 'build/classes/java/main'
+    exclude '**/*.java'
+}
+
+compileJava.dependsOn(copyResources)
+
+/** Currently, virtual robot expects to load OpModes from classpath. Copy them in. */
+tasks.register('copyTeamCodeClasses', Copy) {
+    from '../TeamCode/build/classes/java/main'
+    into 'build/classes/java/main'
+    exclude '**/*.java'
+}
+
+compileJava.dependsOn(copyTeamCodeClasses)
+
+// Define the project group and version
+group 'com.example'
+version '1.0-SNAPSHOT'
+
+// Configure the repositories to fetch dependencies from
+repositories {
+    mavenCentral()
+    google()
+    gradlePluginPortal()
+    flatDir {
+        dirs "../lib"
+    }
+}
+
+// Define dependencies
+dependencies {
+    /* uncomment for cross-platform jar: */
+    runtimeOnly "org.openjfx:javafx-graphics:$javafx.version:win"
+    runtimeOnly "org.openjfx:javafx-graphics:$javafx.version:linux"
+    runtimeOnly "org.openjfx:javafx-graphics:$javafx.version:mac"
+
+    implementation files('../lib/Jamepad.jar')
+    implementation files('../lib/dyn4j-4.1.4.jar')
+    implementation files('../lib/dyn4j-4.1.4-sources.jar')
+    implementation files('../lib/pedro_modified.jar')
+    implementation libs.reflections
+}
+
+mainClassName = 'virtual_robot.controller.VirtualRobotApplication'
+
+jar {
+    duplicatesStrategy(DuplicatesStrategy.EXCLUDE)
+    manifest {
+        attributes 'Main-Class': 'virtual_robot.VirtualRobotApplicationLauncher'
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
