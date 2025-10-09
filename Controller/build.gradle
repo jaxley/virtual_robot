@@ -42,13 +42,13 @@ tasks.register('copyResources', Copy) {
 compileJava.dependsOn(copyResources)
 
 /** Currently, virtual robot expects to load OpModes from classpath. Copy them in. */
-tasks.register('copyTeamCodeClasses', Copy) {
-    from '../TeamCode/build/classes/java/main'
-    into 'build/classes/java/main'
-    exclude '**/*.java'
-}
+//tasks.register('copyTeamCodeClasses', Copy) {
+//    from '../TeamCode/build/classes/java/main'
+//    into 'build/classes/java/main'
+//    exclude '**/*.java'
+//}
 
-compileJava.dependsOn(copyTeamCodeClasses)
+// compileJava.dependsOn(copyTeamCodeClasses)
 
 // Define the project group and version
 group 'com.example'

@@ -13,6 +13,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Group;
+import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
@@ -22,6 +23,8 @@ import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Polyline;
 import javafx.scene.shape.Rectangle;
+import javafx.stage.FileChooser;
+import javafx.stage.Stage;
 import javafx.util.Callback;
 import org.dyn4j.dynamics.Body;
 import org.dyn4j.dynamics.BodyFixture;
@@ -49,12 +52,25 @@ import virtual_robot.robots.ControlsElements;
 import virtual_robot.robots.classes.MecanumBot;
 import virtual_robot.keyboard.KeyState;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.annotation.Annotation;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 /**
  * For internal use only. Controller class for the JavaFX application.
@@ -391,8 +407,28 @@ public class VirtualRobotController {
         return group;
     }
 
-    private void setupCbxOpModes(){
-        Reflections reflections = new Reflections("");
+    private URI writeResourceToTempFile(InputStream resourceStream) throws IOException, URISyntaxException {
+
+        Path tempFile = Files.createTempFile("classes", ".jar");
+
+        try (OutputStream outStream = Files.newOutputStream(tempFile)) {
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+
+            while ((bytesRead = resourceStream.read(buffer)) != -1) {
+                outStream.write(buffer, 0, bytesRead);
+            }
+            return tempFile.toUri();
+        }
+    }
+
+    private void setupCbxOpModes() {
+        setupCbxOpModes(null);
+    }
+
+    private void setupCbxOpModes(ClassLoader classLoader){
+        ClassLoader loader = classLoader != null ? classLoader : this.getClass().getClassLoader();
+        Reflections reflections = new Reflections(loader);
 //        Reflections reflections = new Reflections("org.firstinspires.ftc.teamcode");
         Set<Class<?>> opModes = new HashSet<>();
         opModes.addAll(reflections.getTypesAnnotatedWith(TeleOp.class));
@@ -483,6 +519,33 @@ public class VirtualRobotController {
     public Pane getFieldPane(){ return fieldPane; }
 
     public World<Body> getWorld(){ return world; }
+
+    @FXML
+    private void loadOpModesButtonAction(ActionEvent event) {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Open JAR File");
+        File file = fileChooser.showOpenDialog((Stage)((Node)((EventObject) event).getSource()).getScene().getWindow());
+
+        if (file != null) {
+            try (URLClassLoader child = new URLClassLoader(
+                    new URL[]{file.toURI().toURL()},
+                    this.getClass().getClassLoader()
+            )) {
+                if (child.findResource("classes.jar") != null) {
+                    URI classesJar = writeResourceToTempFile(child.getResourceAsStream("classes.jar"));
+                    URLClassLoader innerChild = new URLClassLoader(new URL[]{classesJar.toURL()}, child);
+                    setupCbxOpModes(innerChild);
+                } else {
+                    setupCbxOpModes(child);
+                }
+
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            } catch (URISyntaxException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
 
     @FXML
     private void handleDriverButtonAction(ActionEvent event){
@@ -699,6 +762,11 @@ public class VirtualRobotController {
             Class opModeClass = cbxOpModes.getValue();
             opMode = (OpMode) opModeClass.newInstance();
         } catch (Exception exc){
+            // TODO: log something here
+            Alert errorAlert = new Alert(Alert.AlertType.ERROR);
+            errorAlert.setHeaderText("Input not valid");
+            errorAlert.setContentText(exc.getMessage());
+            errorAlert.showAndWait();
             return false;
         }
         return true;

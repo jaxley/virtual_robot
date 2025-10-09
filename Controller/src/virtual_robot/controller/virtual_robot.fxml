@@ -34,6 +34,7 @@
                   <Insets bottom="10.0" top="10.0" />
                </VBox.margin>
             </Label>
+            <Button fx:id="driverButton" alignment="CENTER" minWidth="75.0" mnemonicParsing="false" onAction="#loadOpModesButtonAction" text="Load OpModes From File"/>
             <ComboBox fx:id="cbxOpModes" prefWidth="250.0" promptText="OpModes" />
             <Button fx:id="driverButton" alignment="CENTER" minWidth="75.0" mnemonicParsing="false" onAction="#handleDriverButtonAction" text="INIT">
                <VBox.margin>
