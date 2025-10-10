@@ -53,24 +53,21 @@ import virtual_robot.robots.classes.MecanumBot;
 import virtual_robot.keyboard.KeyState;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.annotation.Annotation;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 
 /**
  * For internal use only. Controller class for the JavaFX application.
@@ -95,6 +92,7 @@ public class VirtualRobotController {
     @FXML private Label lblRunTime;
     @FXML private HBox hbxGamePads;
     @FXML private VBox vbxRight;
+    @FXML private CheckBox checkBoxUseVirtualGamepad;
 
     // dyn4j world
     World<Body> world = new World<>();
@@ -198,28 +196,30 @@ public class VirtualRobotController {
         sldSystematicMotorError.valueProperty().addListener(sliderChangeListener);
         sldMotorInertia.valueProperty().addListener(sliderChangeListener);
 
+        setupGamePad();
+    }
+
+    private ScheduledFuture<?> gamePadScheduler;
+    private void setupGamePad() {
+
+        VirtualGamePadConfigStrategy virtualGamePadConfigStrategy = new VirtualGamePadConfigStrategy();
+        RealGamePadConfigStrategy realGamePadConfigStrategy = new RealGamePadConfigStrategy();
+
+        // ensure UI is consistent with config setting
+        checkBoxUseVirtualGamepad.setSelected(Config.USE_VIRTUAL_GAMEPAD);
+
         if (Config.USE_VIRTUAL_GAMEPAD){
-            vbxRight.getChildren().remove(hbxGamePads);
-//            checkBoxGamePad1.setVisible(false);
-//            checkBoxGamePad2.setVisible(false);
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("virtual_gamepad.fxml"));
-            try{
-                HBox hbox = (HBox)loader.load();
-                virtualGamePadController = loader.getController();
-                virtualGamePadController.setVirtualRobotController(this);
-                borderPane.setBottom(hbox);
-            } catch (IOException e){
-                System.out.println("Virtual GamePad UI Failed to Load");
-            }
-            gamePadHelper = new VirtualGamePadHelper();
+            realGamePadConfigStrategy.disable(this);
+            gamePadHelper = virtualGamePadConfigStrategy.enable(this);
         } else {
-            checkBoxGamePad1.setDisable(true);
-            checkBoxGamePad1.setStyle("-fx-opacity: 1");
-            checkBoxGamePad2.setDisable(true);
-            checkBoxGamePad2.setStyle("-fx-opacity: 1");
-            gamePadHelper = new RealGamePadHelper();
+            virtualGamePadConfigStrategy.disable(this);
+            gamePadHelper = realGamePadConfigStrategy.enable(this);
         }
-        gamePadExecutorService.scheduleAtFixedRate(gamePadHelper, 0, 20, TimeUnit.MILLISECONDS);
+        if (gamePadScheduler != null) {
+            // for simplicity, always cancel any existing scheduler
+            gamePadScheduler.cancel(true);
+        }
+        gamePadScheduler = gamePadExecutorService.scheduleAtFixedRate(gamePadHelper, 0, 20, TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -781,7 +781,7 @@ public class VirtualRobotController {
     public void updateTelemetryDisplay(String telemetryText) {
         txtTelemetry.setText(telemetryText);
     }
-		
+
     @FXML
     private void handleCheckBoxAutoHumanAction(ActionEvent event){
         Config.GAME.setHumanPlayerAuto(checkBoxAutoHuman.isSelected());
@@ -806,6 +806,11 @@ public class VirtualRobotController {
         }
     }
 
+    @FXML
+    private void handleCheckBoxUseVirtualGamepad(ActionEvent event) {
+        Config.USE_VIRTUAL_GAMEPAD = checkBoxUseVirtualGamepad.isSelected();
+        setupGamePad();
+    }
 
     private void initializeTelemetryTextArea(){
         StringBuilder sb = new StringBuilder();
@@ -1223,6 +1228,91 @@ public class VirtualRobotController {
             }
         }
 
+    }
+
+    /**
+     * A <a href="https://refactoring.guru/design-patterns/strategy">strategy design pattern</a> interface for a
+     * concrete class that contains all the logic to enable/disable some component configuration.
+     * <p>
+     * Allows you to compose more than one strategy class to cleanly coordinate and toggle
+     * configuration changes of varying complexity.
+     */
+    private interface ConfigChangeStrategy {
+
+        /**
+         * Contains logic to enable the configuration setting(s)
+         * @param vrc A virtual robot controller instance for changing its configuration
+         * @return An instance of a gamepad helper
+         */
+        GamePadHelper enable(VirtualRobotController vrc);
+
+        /**
+         * Contains logic to disable the configuration setting(s)
+         * @param vrc A virtual robot controller instance for changing its configuration
+         */
+        void disable(VirtualRobotController vrc);
+    }
+
+    /**
+     * Use this strategy to configure a virtual gamepad
+     */
+    private class VirtualGamePadConfigStrategy implements ConfigChangeStrategy {
+
+        /**
+         * Configures the desired state to use a virtual gamepad:
+         * - hbxGamePads not displayed setVisible(!Config.VIRTUAL_GAMEPAD)
+         * - virtual_gamepad added to bottom of borderpane
+         * - virtual_gamepad is enabled (setVisible(Config.VIRTUAL_GAMEPAD)
+         * @param vrc A virtual robot controller instance for changing its configuration
+         * @return a VirtualGamePadHelper
+         */
+        @Override
+        public GamePadHelper enable(VirtualRobotController vrc) {
+
+            FXMLLoader loader = new FXMLLoader(vrc.getClass().getResource("virtual_gamepad.fxml"));
+            try {
+                HBox hbox = loader.load();
+                virtualGamePadController = loader.getController();
+                virtualGamePadController.setVirtualRobotController(vrc);
+                borderPane.setBottom(hbox);
+            } catch (IOException e) {
+                // TODO: this should probably alert in the UI
+                System.out.println("Virtual GamePad UI Failed to Load");
+            }
+            return new VirtualGamePadHelper();
+        }
+        @Override
+        public void disable(VirtualRobotController vrc) {
+            borderPane.getBottom().setDisable(true);
+        }
+    }
+
+    /**
+     * Use this strategy to configure a real gamepad
+     */
+    private class RealGamePadConfigStrategy implements ConfigChangeStrategy {
+
+        /**
+         * Configures the desired state to use a real gamepad:
+         * @param vrc A virtual robot controller instance for changing its configuration
+         * @return a RealGamePadHelper
+         */
+        @Override
+        public GamePadHelper enable(VirtualRobotController vrc) {
+            checkBoxGamePad1.setDisable(true);
+            checkBoxGamePad1.setStyle("-fx-opacity: 1");
+            checkBoxGamePad2.setDisable(true);
+            checkBoxGamePad2.setStyle("-fx-opacity: 1");
+            // TODO: investigate these exceptions triggered whenever real gamepad is enabled:
+            //  Caused by: java.lang.reflect.InvocationTargetException
+            //  Caused by: java.lang.UnsatisfiedLinkError: 'boolean com.studiohartman.jamepad.ControllerManager.nativeInitSDLGamepad()'
+            return new RealGamePadHelper();
+        }
+
+        @Override
+        public void disable(VirtualRobotController vrc) {
+            vbxRight.getChildren().remove(hbxGamePads);
+        }
     }
 
 }
